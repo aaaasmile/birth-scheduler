@@ -13,17 +13,6 @@ Per stoppare il sevice si usa:
     git pull --all
     ./publish-service.sh
 
-## Service setup
-Ora bisogna abilitare il service:
-
-    sudo systemctl enable birthday-scheduler.service
-Ora si fa partire il service (resistente al reboot):
-
-    sudo systemctl start birthday-scheduler
-Per vedere i logs si usa:
-
-    sudo journalctl -f -u birthday-scheduler
-
 ## Service Config
 Questo il conetnuto del file che compare con:
 
@@ -42,6 +31,8 @@ Qui segue il contenuto del file birthday-scheduler.service
 Nota il Type=idle che è meglio di simple in quanto così 
 viene fatto partire quando anche la wlan ha ottenuto l'IP intranet
 per consentire l'accesso.
+
+## birthday-scheduler.service
 
 ```
 [Install]
@@ -81,4 +72,8 @@ Nel file data.json ho messo la lista dei compleanni che mi devo ricordare.
 Per aggiornare il server di invido, mi piazzo locale nella dir cert e mando:
 
     rsync -av data.json <user>@<server>:/home/igor/app/go/birthday-scheduler/current/
+
+## Visual Code
+Per lo sviluppo iniziale ho usato windows, poi però, per l'update del service,
+ho usato Visual Code remote nella directory ~/build/birth-scheduler
 
