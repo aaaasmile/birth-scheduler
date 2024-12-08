@@ -13,6 +13,12 @@ import (
 	"time"
 )
 
+type Scheduler struct {
+	datafileName    string
+	nextBirthday    []idl.SchedNextItem
+	nextAnniversary []idl.SchedNextItem
+}
+
 func RunService(configfile string) error {
 
 	if _, err := conf.ReadConfig(configfile); err != nil {
@@ -21,7 +27,8 @@ func RunService(configfile string) error {
 
 	chShutdown := make(chan struct{}, 1)
 	go func(chs chan struct{}) {
-		if err := doSchedule(); err != nil {
+		sch := Scheduler{datafileName: conf.Current.DataFileName}
+		if err := sch.doSchedule(); err != nil {
 			log.Println("Server is not scheduling anymore: ", err)
 			chs <- struct{}{}
 		}
@@ -47,49 +54,55 @@ loop:
 	return nil
 }
 
-type Scheduler struct {
-	nextEvents []idl.SchedNextItem
-}
-
-func doSchedule() error {
-	sch := Scheduler{}
-	if err := sch.readDataJsonFile(conf.Current.DataFileName); err != nil {
-		return err
-	}
-
+func (sch *Scheduler) doSchedule() error {
 	log.Println("Infinite scheduler loop")
-	a := 0
+	last_day := 0
 	for {
-		a++
+		now := time.Now()
 		time.Sleep(1 * time.Second)
-		if a > 10 {
-			return fmt.Errorf("scheduler crash")
+		if now.Day() > last_day {
+			log.Println("day change")
+			last_day = now.Day()
+			if err := sch.reschedule(); err != nil {
+				return err
+			}
 		}
 	}
 }
 
-func (sch *Scheduler) readDataJsonFile(fname string) error {
+func (sch *Scheduler) reschedule() error {
+	schList, err := sch.readDataJsonFile()
+	if err != nil {
+		return err
+	}
+	return sch.scheduleNext(schList)
+}
+
+func (sch *Scheduler) readDataJsonFile() (*idl.SchedList, error) {
+	fname := sch.datafileName
 	log.Println("load scheduler json data ", fname)
 	if fname == "" {
-		return fmt.Errorf("data file is empty")
+		return nil, fmt.Errorf("data file is empty")
 	}
 	f, err := os.Open(fname)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer f.Close()
 	schList := idl.SchedList{}
 
 	err = json.NewDecoder(f).Decode(&schList)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	log.Println("Loaded scheduler from file ", fname, schList)
-	return sch.scheduleNext(&schList)
+	return &schList, nil
 }
 
 func (sch *Scheduler) scheduleNext(schList *idl.SchedList) error {
-	sch.nextEvents = make([]idl.SchedNextItem, 0)
+	sch.nextBirthday = make([]idl.SchedNextItem, 0)
+	sch.nextAnniversary = make([]idl.SchedNextItem, 0)
+
 	now := time.Now()
 	yy := now.Year()
 	for _, item := range schList.List {
@@ -113,9 +126,19 @@ func (sch *Scheduler) scheduleNext(schList *idl.SchedList) error {
 			if err != nil {
 				return err
 			}
-			sch.nextEvents = append(sch.nextEvents, nextItem)
+			if nextItem.EventType == idl.Birthday {
+				sch.nextBirthday = append(sch.nextBirthday, nextItem)
+			}
+			if nextItem.EventType == idl.Anniversary {
+				sch.nextAnniversary = append(sch.nextAnniversary, nextItem)
+			}
 		}
 	}
-	log.Println("Next events ", sch.nextEvents)
+	if len(sch.nextBirthday) > 0 {
+		log.Println("Next birthday ", sch.nextBirthday)
+	}
+	if len(sch.nextAnniversary) > 0 {
+		log.Println("Next anniversary ", sch.nextAnniversary)
+	}
 	return nil
 }
