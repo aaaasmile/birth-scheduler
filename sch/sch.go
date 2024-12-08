@@ -64,7 +64,8 @@ func (sch *Scheduler) doSchedule() error {
 	last_month := time.Month(1)
 	last_year := 0
 	for {
-		time.Sleep(1 * time.Second)
+		time.Sleep(60 * time.Second)
+
 		now := time.Now()
 		if now.Year() > last_year {
 			log.Println("year change")
@@ -143,22 +144,22 @@ func (sch *Scheduler) scheduleNext(schList *idl.SchedList) error {
 			return err
 		}
 		time_item := time.Date(yy, mm, dd, 23, 59, 0, 0, time.Local)
-		if time_item.Unix() > 0 { //now.Unix() {
+		if time_item.Unix() > now.Unix() {
 			nextItem := idl.SchedNextItem{Name: item.Name, Note: item.Note, Time: time_item}
 			err = nextItem.SetEventType(item.Type)
 			//log.Println("check ", nextItem)
 			if err != nil {
 				return err
 			}
-			//if now.Day() == time_item.Day() {
-			if nextItem.EventType == idl.Birthday {
-				sch.nextBirthday = append(sch.nextBirthday, &nextItem)
+			if now.Day() == time_item.Day() {
+				if nextItem.EventType == idl.Birthday {
+					sch.nextBirthday = append(sch.nextBirthday, &nextItem)
 
+				}
+				if nextItem.EventType == idl.Anniversary {
+					sch.nextAnniversary = append(sch.nextAnniversary, &nextItem)
+				}
 			}
-			if nextItem.EventType == idl.Anniversary {
-				sch.nextAnniversary = append(sch.nextAnniversary, &nextItem)
-			}
-			//}
 		}
 	}
 	found := false
