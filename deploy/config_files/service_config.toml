@@ -1,0 +1,12 @@
+DataFileName = "data.json"
+EmailTarget = "<todo in custom>"
+SimulateMail = false
+
+[Relay]
+Mail = "<todo in custom>"
+Secret = "<todo in custom>"
+Host  = "<todo in custom>"
+User = "<todo in custom>"
+
+
+
