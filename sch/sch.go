@@ -8,6 +8,8 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -16,7 +18,6 @@ func RunService(configfile string) error {
 	if _, err := conf.ReadConfig(configfile); err != nil {
 		return err
 	}
-	log.Println("Configuration is read")
 
 	chShutdown := make(chan struct{}, 1)
 	go func(chs chan struct{}) {
@@ -28,7 +29,7 @@ func RunService(configfile string) error {
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
-	log.Println("Enter in server loop")
+	log.Println("Enter in server blocking loop")
 
 loop:
 	for {
@@ -47,7 +48,7 @@ loop:
 }
 
 type Scheduler struct {
-	next idl.SchedItem
+	nextEvents []idl.SchedNextItem
 }
 
 func doSchedule() error {
@@ -56,7 +57,7 @@ func doSchedule() error {
 		return err
 	}
 
-	log.Println("Enter into an infinite loop")
+	log.Println("Infinite scheduler loop")
 	a := 0
 	for {
 		a++
@@ -84,6 +85,37 @@ func (sch *Scheduler) readDataJsonFile(fname string) error {
 		return err
 	}
 	log.Println("Loaded scheduler from file ", fname, schList)
+	return sch.scheduleNext(&schList)
+}
 
+func (sch *Scheduler) scheduleNext(schList *idl.SchedList) error {
+	sch.nextEvents = make([]idl.SchedNextItem, 0)
+	now := time.Now()
+	yy := now.Year()
+	for _, item := range schList.List {
+		tmp_arr := strings.Split(item.MonthDay, "-")
+		if len(tmp_arr) != 2 {
+			return fmt.Errorf("expect month-day format, but get %s", item.MonthDay)
+		}
+		mmi, err := strconv.Atoi(tmp_arr[0])
+		if err != nil {
+			return err
+		}
+		dd, err := strconv.Atoi(tmp_arr[1])
+		if err != nil {
+			return err
+		}
+		mm := time.Month(mmi)
+		time_item := time.Date(yy, mm, dd, 23, 59, 0, 0, time.Local)
+		if time_item.Unix() > now.Unix() {
+			nextItem := idl.SchedNextItem{Name: item.Name, Note: item.Note, Time: time_item}
+			err = nextItem.SetEventType(item.Type)
+			if err != nil {
+				return err
+			}
+			sch.nextEvents = append(sch.nextEvents, nextItem)
+		}
+	}
+	log.Println("Next events ", sch.nextEvents)
 	return nil
 }
