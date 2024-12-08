@@ -8,11 +8,11 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
+	"html/template"
 	"io"
 	"log"
 	"net"
 	"net/smtp"
-	"text/template"
 )
 
 type MailSender struct {
