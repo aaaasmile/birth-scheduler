@@ -3,6 +3,7 @@ package sch
 import (
 	"birthsch/conf"
 	"birthsch/idl"
+	"birthsch/mail"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -15,8 +16,9 @@ import (
 
 type Scheduler struct {
 	datafileName    string
-	nextBirthday    []idl.SchedNextItem
-	nextAnniversary []idl.SchedNextItem
+	nextBirthday    []*idl.SchedNextItem
+	nextAnniversary []*idl.SchedNextItem
+	mail_simulation bool
 }
 
 func RunService(configfile string) error {
@@ -27,7 +29,9 @@ func RunService(configfile string) error {
 
 	chShutdown := make(chan struct{}, 1)
 	go func(chs chan struct{}) {
-		sch := Scheduler{datafileName: conf.Current.DataFileName}
+		sch := Scheduler{datafileName: conf.Current.DataFileName,
+			mail_simulation: conf.Current.SimulateMail,
+		}
 		if err := sch.doSchedule(); err != nil {
 			log.Println("Server is not scheduling anymore: ", err)
 			chs <- struct{}{}
@@ -58,12 +62,17 @@ func (sch *Scheduler) doSchedule() error {
 	log.Println("Infinite scheduler loop")
 	last_day := 0
 	for {
-		now := time.Now()
 		time.Sleep(1 * time.Second)
+		now := time.Now()
 		if now.Day() > last_day {
 			log.Println("day change")
 			last_day = now.Day()
 			if err := sch.reschedule(); err != nil {
+				return err
+			}
+		}
+		if now.Hour() > 9 && sch.hasItems() {
+			if err := sch.sendItemsAlarm(); err != nil {
 				return err
 			}
 		}
@@ -100,8 +109,8 @@ func (sch *Scheduler) readDataJsonFile() (*idl.SchedList, error) {
 }
 
 func (sch *Scheduler) scheduleNext(schList *idl.SchedList) error {
-	sch.nextBirthday = make([]idl.SchedNextItem, 0)
-	sch.nextAnniversary = make([]idl.SchedNextItem, 0)
+	sch.nextBirthday = make([]*idl.SchedNextItem, 0)
+	sch.nextAnniversary = make([]*idl.SchedNextItem, 0)
 
 	now := time.Now()
 	yy := now.Year()
@@ -127,10 +136,12 @@ func (sch *Scheduler) scheduleNext(schList *idl.SchedList) error {
 				return err
 			}
 			if nextItem.EventType == idl.Birthday {
-				sch.nextBirthday = append(sch.nextBirthday, nextItem)
+				if now.Day() == time_item.Day() {
+					sch.nextBirthday = append(sch.nextBirthday, &nextItem)
+				}
 			}
 			if nextItem.EventType == idl.Anniversary {
-				sch.nextAnniversary = append(sch.nextAnniversary, nextItem)
+				sch.nextAnniversary = append(sch.nextAnniversary, &nextItem)
 			}
 		}
 	}
@@ -140,5 +151,59 @@ func (sch *Scheduler) scheduleNext(schList *idl.SchedList) error {
 	if len(sch.nextAnniversary) > 0 {
 		log.Println("Next anniversary ", sch.nextAnniversary)
 	}
+	return nil
+}
+
+func (sch *Scheduler) hasItems() bool {
+	if len(sch.nextAnniversary) > 0 {
+		return true
+	}
+	if len(sch.nextBirthday) > 0 {
+		return true
+	}
+	return false
+}
+
+func (sch *Scheduler) sendItemsAlarm() error {
+	if len(sch.nextBirthday) > 0 {
+		if err := sch.sendBirthdayAlarm(); err != nil {
+			return err
+		}
+	}
+	if len(sch.nextAnniversary) > 0 {
+		if err := sch.sendAnniversaryAlarm(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (sch *Scheduler) sendBirthdayAlarm() error {
+	mail := mail.MailSender{}
+	mail.FillConf(sch.mail_simulation)
+	templFileName := "templates/birthday-mail.html"
+	if err := mail.BuildEmailMsg(templFileName, sch.nextBirthday); err != nil {
+		return err
+	}
+	if err := mail.SendEmailViaRelay(); err != nil {
+		return err
+	}
+	sch.nextBirthday = make([]*idl.SchedNextItem, 0)
+
+	return nil
+}
+
+func (sch *Scheduler) sendAnniversaryAlarm() error {
+	mail := mail.MailSender{}
+	mail.FillConf(sch.mail_simulation)
+	templFileName := "templates/anniversary-mail.html"
+	if err := mail.BuildEmailMsg(templFileName, sch.nextAnniversary); err != nil {
+		return err
+	}
+	if err := mail.SendEmailViaRelay(); err != nil {
+		return err
+	}
+
+	sch.nextAnniversary = make([]*idl.SchedNextItem, 0)
 	return nil
 }

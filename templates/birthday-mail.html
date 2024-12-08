@@ -1,0 +1,33 @@
+{{define "mailSubj" -}}
+Subject: Birthday Alarm
+{{end}}
+
+{{define "mailbody" -}}
+<div>Hello my Friend,</div>
+<p>there are birthdays that you don't have to forget.</p>
+
+<div>
+    {{- range . -}}
+    <div>{{.Name}}</div>
+    <div>{{.Note}}</div>
+    <div>{{.Time}}</div>
+    <hr>
+    {{- end}}
+</div>
+
+<p>Enjoy,</p>
+<p>aaaasmile</p>
+{{- end}}
+
+{{define "mailPlain" -}}
+Hello friend,
+there are birthdays that you don't have to forget.
+{{ range . }}
+{{.Name}}
+{{.Note}}
+{{.Time}}
+{{- end}}
+
+Enjoy,
+aaaasmile
+{{- end}}

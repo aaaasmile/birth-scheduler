@@ -9,17 +9,18 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
+type Config struct {
+	DataFileName string
+	Relay        *Relay
+	EmailTarget  string
+	SimulateMail bool
+}
+
 type Relay struct {
 	Mail   string
 	Secret string
 	Host   string
 	User   string
-}
-
-type Config struct {
-	DataFileName string
-	Relay        *Relay
-	EmailTarget  string
 }
 
 var Current = &Config{}

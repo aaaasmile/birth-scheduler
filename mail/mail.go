@@ -2,11 +2,17 @@ package mail
 
 import (
 	"birthsch/conf"
+	"birthsch/idl"
 	"bytes"
+	"crypto/rand"
 	"crypto/tls"
+	"encoding/base64"
+	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/smtp"
+	"text/template"
 )
 
 type MailSender struct {
@@ -14,6 +20,79 @@ type MailSender struct {
 	simulate bool
 	emailTo  string
 	message  *bytes.Buffer
+}
+
+func (ms *MailSender) FillConf(simulate bool) {
+	ms.relay = *conf.Current.Relay
+	ms.emailTo = conf.Current.EmailTarget
+	ms.simulate = simulate
+}
+
+func (ms *MailSender) BuildEmailMsg(templFileName string, listsrc []*idl.SchedNextItem) error {
+	bound1 := randomBoundary()
+	bound2 := randomBoundary()
+
+	imgBuf := &bytes.Buffer{}
+	if len(listsrc) > 0 {
+		imgBuf.Write([]byte("--" + bound1 + "--"))
+	}
+
+	var partHTMLCont, partSubj, partPlainContent bytes.Buffer
+	tmplBodyMail := template.Must(template.New("MailBody").ParseFiles(templFileName))
+	if err := tmplBodyMail.ExecuteTemplate(&partHTMLCont, "mailbody", listsrc); err != nil {
+		return err
+	}
+	if err := tmplBodyMail.ExecuteTemplate(&partSubj, "mailSubj", listsrc); err != nil {
+		return err
+	}
+
+	if err := tmplBodyMail.ExecuteTemplate(&partPlainContent, "mailPlain", listsrc); err != nil {
+		return err
+	}
+
+	msg := &bytes.Buffer{}
+	msg.Write([]byte("MIME-version: 1.0;\r\n"))
+	partSubj.WriteTo(msg)
+	if ms.relay.Mail != "" {
+		msg.Write([]byte("From: " + ms.relay.Mail + "\r\n"))
+	}
+	msg.Write([]byte("To: " + ms.emailTo + "\r\n"))
+	msg.Write([]byte("Content-Type:  multipart/related; boundary=" + `"` + bound1 + `"` + "\r\n"))
+	msg.Write([]byte("\r\n"))
+
+	msg.Write([]byte("--" + bound1 + "\r\n"))
+	msg.Write([]byte("Content-Type:  multipart/alternative; boundary=" + `"` + bound2 + `"` + "\r\n"))
+	msg.Write([]byte("\r\n"))
+
+	// plain section
+	msg.Write([]byte("--" + bound2 + "\r\n"))
+	msg.Write([]byte("Content-Type: text/plain; charset=\"UTF-8\"\r\n"))
+	partPlainContent.WriteTo(msg)
+	msg.Write([]byte("\r\n"))
+
+	// html section
+	msg.Write([]byte("--" + bound2 + "\r\n"))
+	msg.Write([]byte("Content-Type: text/html; charset=\"UTF-8\"\r\n"))
+	msg.Write([]byte("Content-Transfer-Encoding: base64\r\n"))
+	msg.Write([]byte("\r\n"))
+	partHTMLCont64 := formatRFCRawWithEnc64(partHTMLCont.Bytes())
+	partHTMLCont64.WriteTo(msg)
+	msg.Write([]byte("\r\n"))
+	msg.Write([]byte("--" + bound2 + "--" + "\r\n"))
+
+	// embedded images section
+	imgBuf.WriteTo(msg)
+
+	if ms.simulate {
+		ss := msg.String()
+		maxchar := 2000
+		if len(ss) > maxchar {
+			ss = ss[0:maxchar]
+		}
+		fmt.Printf("Message is: \n%s\n", ss)
+	}
+	ms.message = msg
+	return nil
 }
 
 func (ms *MailSender) SendEmailViaRelay() error {
@@ -79,4 +158,39 @@ func (ms *MailSender) SendEmailViaRelay() error {
 	log.Println("E-Mail is on the way. Everything is going well.")
 
 	return nil
+}
+
+func randomBoundary() string {
+	var buf [30]byte
+	_, err := io.ReadFull(rand.Reader, buf[:])
+	if err != nil {
+		panic(err)
+	}
+	return fmt.Sprintf("%x", buf[:])
+}
+
+func formatRFCRawWithEnc64(raw []byte) *bytes.Buffer {
+	//  RFC 2045 formatting to 76 col
+	maxLineLen := 76
+	p := base64Encode(raw)
+	w := &bytes.Buffer{}
+	n := 0
+	lineLen := 0
+	for len(p)+lineLen > maxLineLen {
+		w.Write(p[:maxLineLen-lineLen])
+		w.Write([]byte("\r\n"))
+		p = p[maxLineLen-lineLen:]
+		n += maxLineLen - lineLen
+		lineLen = 0
+	}
+	w.Write(p)
+	log.Println("Buffer size: ", n+len(p))
+
+	return w
+}
+
+func base64Encode(message []byte) []byte {
+	b := make([]byte, base64.StdEncoding.EncodedLen(len(message)))
+	base64.StdEncoding.Encode(b, message)
+	return b
 }
