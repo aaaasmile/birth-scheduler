@@ -2,16 +2,13 @@ package sch
 
 import (
 	"birthsch/conf"
+	"birthsch/idl"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"time"
-)
-
-var (
-	Appname = "birthday-sch"
-	Buildnr = "00.001.20241208-00"
 )
 
 func RunService(configfile string) error {
@@ -49,7 +46,16 @@ loop:
 	return nil
 }
 
+type Scheduler struct {
+	next idl.SchedItem
+}
+
 func doSchedule() error {
+	sch := Scheduler{}
+	if err := sch.readDataJsonFile(conf.Current.DataFileName); err != nil {
+		return err
+	}
+
 	log.Println("Enter into an infinite loop")
 	a := 0
 	for {
@@ -59,4 +65,25 @@ func doSchedule() error {
 			return fmt.Errorf("scheduler crash")
 		}
 	}
+}
+
+func (sch *Scheduler) readDataJsonFile(fname string) error {
+	log.Println("load scheduler json data ", fname)
+	if fname == "" {
+		return fmt.Errorf("data file is empty")
+	}
+	f, err := os.Open(fname)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	schList := idl.SchedList{}
+
+	err = json.NewDecoder(f).Decode(&schList)
+	if err != nil {
+		return err
+	}
+	log.Println("Loaded scheduler from file ", fname, schList)
+
+	return nil
 }

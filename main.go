@@ -1,6 +1,7 @@
 package main
 
 import (
+	"birthsch/idl"
 	"birthsch/sch"
 	"flag"
 	"fmt"
@@ -13,7 +14,7 @@ func main() {
 	flag.Parse()
 
 	if *ver {
-		fmt.Printf("%s, version: %s", sch.Appname, sch.Buildnr)
+		fmt.Printf("%s, version: %s", idl.Appname, idl.Buildnr)
 		os.Exit(0)
 	}
 
