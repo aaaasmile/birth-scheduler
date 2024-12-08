@@ -146,7 +146,7 @@ func (sch *Scheduler) scheduleNext(schList *idl.SchedList) error {
 		}
 	}
 	if len(sch.nextBirthday) > 0 {
-		log.Println("Next birthday ", sch.nextBirthday)
+		log.Println("Next birthday ", sch.nextBirthday[0])
 	}
 	if len(sch.nextAnniversary) > 0 {
 		log.Println("Next anniversary ", sch.nextAnniversary)

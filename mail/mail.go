@@ -19,7 +19,7 @@ type MailSender struct {
 	relay    conf.Relay
 	simulate bool
 	emailTo  string
-	message  *bytes.Buffer
+	message  bytes.Buffer
 }
 
 func (ms *MailSender) FillConf(simulate bool) {
@@ -29,13 +29,9 @@ func (ms *MailSender) FillConf(simulate bool) {
 }
 
 func (ms *MailSender) BuildEmailMsg(templFileName string, listsrc []*idl.SchedNextItem) error {
-	bound1 := randomBoundary()
+	//bound1 := randomBoundary()
+	ms.message = bytes.Buffer{}
 	bound2 := randomBoundary()
-
-	imgBuf := &bytes.Buffer{}
-	if len(listsrc) > 0 {
-		imgBuf.Write([]byte("--" + bound1 + "--"))
-	}
 
 	var partHTMLCont, partSubj, partPlainContent bytes.Buffer
 	tmplBodyMail := template.Must(template.New("MailBody").ParseFiles(templFileName))
@@ -50,17 +46,13 @@ func (ms *MailSender) BuildEmailMsg(templFileName string, listsrc []*idl.SchedNe
 		return err
 	}
 
-	msg := &bytes.Buffer{}
+	msg := &ms.message
 	msg.Write([]byte("MIME-version: 1.0;\r\n"))
 	partSubj.WriteTo(msg)
 	if ms.relay.Mail != "" {
 		msg.Write([]byte("From: " + ms.relay.Mail + "\r\n"))
 	}
 	msg.Write([]byte("To: " + ms.emailTo + "\r\n"))
-	msg.Write([]byte("Content-Type:  multipart/related; boundary=" + `"` + bound1 + `"` + "\r\n"))
-	msg.Write([]byte("\r\n"))
-
-	msg.Write([]byte("--" + bound1 + "\r\n"))
 	msg.Write([]byte("Content-Type:  multipart/alternative; boundary=" + `"` + bound2 + `"` + "\r\n"))
 	msg.Write([]byte("\r\n"))
 
@@ -80,9 +72,6 @@ func (ms *MailSender) BuildEmailMsg(templFileName string, listsrc []*idl.SchedNe
 	msg.Write([]byte("\r\n"))
 	msg.Write([]byte("--" + bound2 + "--" + "\r\n"))
 
-	// embedded images section
-	imgBuf.WriteTo(msg)
-
 	if ms.simulate {
 		ss := msg.String()
 		maxchar := 2000
@@ -91,7 +80,6 @@ func (ms *MailSender) BuildEmailMsg(templFileName string, listsrc []*idl.SchedNe
 		}
 		fmt.Printf("Message is: \n%s\n", ss)
 	}
-	ms.message = msg
 	return nil
 }
 
@@ -101,6 +89,10 @@ func (ms *MailSender) SendEmailViaRelay() error {
 	if ms.simulate {
 		log.Println("This is a simulation, e-mail is not sent")
 		return nil
+	}
+	len_msg := len(ms.message.Bytes())
+	if len_msg == 0 {
+		return fmt.Errorf("message mail is empty")
 	}
 
 	servername := ms.relay.Host
@@ -130,11 +122,11 @@ func (ms *MailSender) SendEmailViaRelay() error {
 		return err
 	}
 
-	log.Println("send From")
+	log.Println("send From", ms.relay.Mail)
 	if err = c.Mail(ms.relay.Mail); err != nil {
 		return err
 	}
-	log.Println("send To")
+	log.Println("send To", ms.emailTo)
 	if err = c.Rcpt(ms.emailTo); err != nil {
 		return err
 	}
@@ -143,14 +135,15 @@ func (ms *MailSender) SendEmailViaRelay() error {
 	if err != nil {
 		return err
 	}
-	log.Println("Send the message to the relay")
-	_, err = w.Write(ms.message.Bytes())
+	log.Println("Send the message to the relay (len)", len_msg, ms.message.String())
+	nbt, err := w.Write(ms.message.Bytes())
 	if err != nil {
 		return err
 	}
-	log.Println("Close relay")
+	log.Println("Close relay after ", nbt)
 	err = w.Close()
 	if err != nil {
+		log.Println("[SendEmailViaRelay] error ", err)
 		return err
 	}
 	log.Println("Quit relay")
