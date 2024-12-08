@@ -40,7 +40,7 @@ func (sni *SchedNextItem) SetEventType(tt string) error {
 	case "Compl":
 		sni.EventType = Birthday
 		return nil
-	case "Ann":
+	case "Anniv":
 		sni.EventType = Anniversary
 		return nil
 	}

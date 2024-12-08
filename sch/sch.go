@@ -61,9 +61,22 @@ loop:
 func (sch *Scheduler) doSchedule() error {
 	log.Println("Infinite scheduler loop")
 	last_day := 0
+	last_month := time.Month(1)
+	last_year := 0
 	for {
 		time.Sleep(1 * time.Second)
 		now := time.Now()
+		if now.Year() > last_year {
+			log.Println("year change")
+			last_year = now.Year()
+			last_month = time.Month(1)
+			last_day = 0
+		}
+		if now.Month() > last_month {
+			log.Println("month change")
+			last_month = now.Month()
+			last_day = 0
+		}
 		if now.Day() > last_day {
 			log.Println("day change")
 			last_day = now.Day()
@@ -71,7 +84,8 @@ func (sch *Scheduler) doSchedule() error {
 				return err
 			}
 		}
-		if now.Hour() > 9 && sch.hasItems() {
+		if sch.hasItems() && now.Hour() > 9 {
+			log.Println("time to send an alarm ", now)
 			if err := sch.sendItemsAlarm(); err != nil {
 				return err
 			}
@@ -111,15 +125,16 @@ func (sch *Scheduler) readDataJsonFile() (*idl.SchedList, error) {
 func (sch *Scheduler) scheduleNext(schList *idl.SchedList) error {
 	sch.nextBirthday = make([]*idl.SchedNextItem, 0)
 	sch.nextAnniversary = make([]*idl.SchedNextItem, 0)
-
 	now := time.Now()
+	log.Println("Schedule next for ", now)
+
 	yy := now.Year()
 	for _, item := range schList.List {
 		tmp_arr := strings.Split(item.MonthDay, "-")
 		if len(tmp_arr) != 2 {
 			return fmt.Errorf("expect month-day format, but get %s", item.MonthDay)
 		}
-		mmi, err := strconv.Atoi(tmp_arr[0])
+		mm, err := monthToMonth(tmp_arr[0])
 		if err != nil {
 			return err
 		}
@@ -127,31 +142,69 @@ func (sch *Scheduler) scheduleNext(schList *idl.SchedList) error {
 		if err != nil {
 			return err
 		}
-		mm := time.Month(mmi)
 		time_item := time.Date(yy, mm, dd, 23, 59, 0, 0, time.Local)
-		if time_item.Unix() > now.Unix() {
+		if time_item.Unix() > 0 { //now.Unix() {
 			nextItem := idl.SchedNextItem{Name: item.Name, Note: item.Note, Time: time_item}
 			err = nextItem.SetEventType(item.Type)
+			//log.Println("check ", nextItem)
 			if err != nil {
 				return err
 			}
+			//if now.Day() == time_item.Day() {
 			if nextItem.EventType == idl.Birthday {
-				if now.Day() == time_item.Day() {
-					sch.nextBirthday = append(sch.nextBirthday, &nextItem)
-				}
+				sch.nextBirthday = append(sch.nextBirthday, &nextItem)
+
 			}
 			if nextItem.EventType == idl.Anniversary {
 				sch.nextAnniversary = append(sch.nextAnniversary, &nextItem)
 			}
+			//}
 		}
 	}
+	found := false
 	if len(sch.nextBirthday) > 0 {
 		log.Println("Next birthday ", sch.nextBirthday[0])
+		found = true
 	}
 	if len(sch.nextAnniversary) > 0 {
 		log.Println("Next anniversary ", sch.nextAnniversary)
+		found = true
+	}
+	if !found {
+		log.Println("Nothing found for today ", now)
 	}
 	return nil
+}
+
+func monthToMonth(s string) (time.Month, error) {
+	switch s {
+	case "Gen":
+		return time.Month(1), nil
+	case "Feb":
+		return time.Month(2), nil
+	case "Mar":
+		return time.Month(3), nil
+	case "Apr":
+		return time.Month(4), nil
+	case "Mag":
+		return time.Month(5), nil
+	case "Giu":
+		return time.Month(6), nil
+	case "Lug":
+		return time.Month(7), nil
+	case "Ago":
+		return time.Month(8), nil
+	case "Set":
+		return time.Month(9), nil
+	case "Ott":
+		return time.Month(10), nil
+	case "Nov":
+		return time.Month(11), nil
+	case "Dic":
+		return time.Month(12), nil
+
+	}
+	return 0, fmt.Errorf("month not recongnized %s", s)
 }
 
 func (sch *Scheduler) hasItems() bool {

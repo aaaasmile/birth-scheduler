@@ -27,7 +27,7 @@ func main() {
 	flag.Parse()
 
 	rootDirRel := ".."
-	pathItems := []string{"birthday-scheduler.bin"}
+	pathItems := []string{"birthday-scheduler.bin", "templates"}
 	switch *target {
 	case service:
 		pathItems = append(pathItems, "deploy/config_files/service_config.toml")

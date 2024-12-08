@@ -1,0 +1,16 @@
+{
+    "List": [
+        {
+            "Name": "Max De Gan",
+            "MonthDay": "Gen-03",
+            "Type": "Compl",
+            "Note": "Sms"
+        },
+        {
+            "Name": "Max De Gan",
+            "MonthDay": "Ott-23",
+            "Type": "Anniv",
+            "Note": "Anniversario"
+        }
+    ]
+}
