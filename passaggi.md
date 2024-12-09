@@ -1,4 +1,4 @@
-# Birthsday Sceduler
+# Birthday scheduler
 Un semplice service per mandare dei messaggi (via relay-mail e/o telegram) che mi 
 ricordano i compleanni ai quali voglio mandare gli auguri.
 L'allarme è configurabile via template e può essere simulato (mostra il messaggio senza mandarlo). 
