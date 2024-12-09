@@ -4,6 +4,7 @@ import (
 	"birthsch/conf"
 	"birthsch/idl"
 	"birthsch/mail"
+	"birthsch/telegram"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -19,6 +20,7 @@ type Scheduler struct {
 	nextBirthday    []*idl.SchedNextItem
 	nextAnniversary []*idl.SchedNextItem
 	simulation      bool
+	debug           bool
 }
 
 func RunService(configfile string, simulate bool) error {
@@ -30,7 +32,8 @@ func RunService(configfile string, simulate bool) error {
 	chShutdown := make(chan struct{}, 1)
 	go func(chs chan struct{}) {
 		sch := Scheduler{datafileName: conf.Current.DataFileName,
-			simulation: (conf.Current.SimulateMail || simulate),
+			simulation: (conf.Current.SimulateAlarm || simulate),
+			debug:      conf.Current.Debug,
 		}
 		if err := sch.doSchedule(); err != nil {
 			log.Println("Server is not scheduling anymore: ", err)
@@ -232,14 +235,23 @@ func (sch *Scheduler) sendItemsAlarm() error {
 }
 
 func (sch *Scheduler) sendBirthdayAlarm() error {
-	if err := sendEmail("templates/birthday-mail.html", sch.simulation, sch.nextBirthday); err != nil {
+	templ := "templates/birthday-mail.html"
+	if err := sendEmail(templ, sch.simulation, sch.nextBirthday); err != nil {
 		return err
 	}
+	if err := sendTelegram(templ, sch.simulation, sch.nextBirthday, sch.debug); err != nil {
+		return err
+	}
+
 	sch.nextBirthday = make([]*idl.SchedNextItem, 0)
 	return nil
 }
 func (sch *Scheduler) sendAnniversaryAlarm() error {
-	if err := sendEmail("templates/anniversary-mail.html", sch.simulation, sch.nextAnniversary); err != nil {
+	templ := "templates/anniversary-mail.html"
+	if err := sendEmail(templ, sch.simulation, sch.nextAnniversary); err != nil {
+		return err
+	}
+	if err := sendTelegram(templ, sch.simulation, sch.nextAnniversary, sch.debug); err != nil {
 		return err
 	}
 	sch.nextAnniversary = make([]*idl.SchedNextItem, 0)
@@ -253,6 +265,19 @@ func sendEmail(templFileName string, simulation bool, schItems []*idl.SchedNextI
 		return err
 	}
 	if err := mail.SendEmailViaRelay(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func sendTelegram(templFileName string, simulation bool, schItems []*idl.SchedNextItem, debug bool) error {
+	ts := telegram.TelegramSender{}
+	ts.FillConf(simulation, debug)
+
+	if err := ts.BuildMsg(templFileName, schItems); err != nil {
+		return err
+	}
+	if err := ts.Send(); err != nil {
 		return err
 	}
 	return nil

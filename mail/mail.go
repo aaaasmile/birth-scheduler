@@ -18,18 +18,18 @@ import (
 type MailSender struct {
 	relay    conf.Relay
 	simulate bool
-	emailTo  string
 	message  bytes.Buffer
 }
 
 func (ms *MailSender) FillConf(simulate bool) {
 	ms.relay = *conf.Current.Relay
-	ms.emailTo = conf.Current.EmailTarget
 	ms.simulate = simulate
 }
 
 func (ms *MailSender) BuildEmailMsg(templFileName string, listsrc []*idl.SchedNextItem) error {
-	//bound1 := randomBoundary()
+	if !ms.relay.SendMail {
+		return nil
+	}
 	ms.message = bytes.Buffer{}
 	bound2 := randomBoundary()
 
@@ -49,10 +49,10 @@ func (ms *MailSender) BuildEmailMsg(templFileName string, listsrc []*idl.SchedNe
 	msg := &ms.message
 	msg.Write([]byte("MIME-version: 1.0;\r\n"))
 	partSubj.WriteTo(msg)
-	if ms.relay.Mail != "" {
-		msg.Write([]byte("From: " + ms.relay.Mail + "\r\n"))
+	if ms.relay.MailFrom != "" {
+		msg.Write([]byte("From: " + ms.relay.MailFrom + "\r\n"))
 	}
-	msg.Write([]byte("To: " + ms.emailTo + "\r\n"))
+	msg.Write([]byte("To: " + ms.relay.EmailTarget + "\r\n"))
 	msg.Write([]byte("Content-Type:  multipart/alternative; boundary=" + `"` + bound2 + `"` + "\r\n"))
 	msg.Write([]byte("\r\n"))
 
@@ -84,6 +84,11 @@ func (ms *MailSender) BuildEmailMsg(templFileName string, listsrc []*idl.SchedNe
 }
 
 func (ms *MailSender) SendEmailViaRelay() error {
+	if !ms.relay.SendMail {
+		log.Println("sending mail is not configured")
+		return nil
+	}
+
 	log.Println("Send email using relay host")
 
 	if ms.simulate {
@@ -122,12 +127,12 @@ func (ms *MailSender) SendEmailViaRelay() error {
 		return err
 	}
 
-	log.Println("send From", ms.relay.Mail)
-	if err = c.Mail(ms.relay.Mail); err != nil {
+	log.Println("send From", ms.relay.MailFrom)
+	if err = c.Mail(ms.relay.MailFrom); err != nil {
 		return err
 	}
-	log.Println("send To", ms.emailTo)
-	if err = c.Rcpt(ms.emailTo); err != nil {
+	log.Println("send To", ms.relay.EmailTarget)
+	if err = c.Rcpt(ms.relay.EmailTarget); err != nil {
 		return err
 	}
 

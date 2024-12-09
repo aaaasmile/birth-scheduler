@@ -1,14 +1,16 @@
 DataFileName = "data.json"
-EmailTarget = "<todo in custom>"
-SimulateMail = false
+SimulateAlarm = false
+Debug = false
 
 [Relay]
-Mail = "<todo in custom>"
+SendMail = false
+EmailTarget = "<todo in custom>"
+MailFrom = "<todo in custom>"
 Secret = "<todo in custom>"
 Host = "<todo in custom>"
 User = "<todo in custom>"
 
 [Telegram]
-SendTelegram = true
+SendTelegram = false
 ChatID = -1
 APIString = "<todo in custom>"
