@@ -12,8 +12,15 @@ import (
 type Config struct {
 	DataFileName string
 	Relay        *Relay
+	Telegram     *Telegram
 	EmailTarget  string
 	SimulateMail bool
+}
+
+type Telegram struct {
+	SendTelegram bool
+	ChatID       int64
+	APIString    string
 }
 
 type Relay struct {
@@ -37,7 +44,7 @@ func ReadConfig(configfile string) (*Config, error) {
 		return nil, err
 	}
 
-	log.Println("Configuration: ", Current.EmailTarget, Current.Relay)
+	log.Println("Configuration: ", Current.EmailTarget, Current.Relay.Host, Current.Relay.Mail, Current.Telegram.SendTelegram)
 	return Current, nil
 }
 

@@ -5,5 +5,10 @@ SimulateMail = false
 [Relay]
 Mail = "<todo in custom>"
 Secret = "<todo in custom>"
-Host  = "<todo in custom>"
+Host = "<todo in custom>"
 User = "<todo in custom>"
+
+[Telegram]
+SendTelegram = true
+ChatID = -1
+APIString = "<todo in custom>"

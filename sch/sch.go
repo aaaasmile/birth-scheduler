@@ -18,10 +18,10 @@ type Scheduler struct {
 	datafileName    string
 	nextBirthday    []*idl.SchedNextItem
 	nextAnniversary []*idl.SchedNextItem
-	mail_simulation bool
+	simulation      bool
 }
 
-func RunService(configfile string) error {
+func RunService(configfile string, simulate bool) error {
 
 	if _, err := conf.ReadConfig(configfile); err != nil {
 		return err
@@ -30,7 +30,7 @@ func RunService(configfile string) error {
 	chShutdown := make(chan struct{}, 1)
 	go func(chs chan struct{}) {
 		sch := Scheduler{datafileName: conf.Current.DataFileName,
-			mail_simulation: conf.Current.SimulateMail,
+			simulation: (conf.Current.SimulateMail || simulate),
 		}
 		if err := sch.doSchedule(); err != nil {
 			log.Println("Server is not scheduling anymore: ", err)
@@ -64,8 +64,6 @@ func (sch *Scheduler) doSchedule() error {
 	last_month := time.Month(1)
 	last_year := 0
 	for {
-		time.Sleep(60 * time.Second)
-
 		now := time.Now()
 		if now.Year() > last_year {
 			log.Println("year change")
@@ -85,12 +83,13 @@ func (sch *Scheduler) doSchedule() error {
 				return err
 			}
 		}
-		if sch.hasItems() && now.Hour() > 9 {
+		if sch.hasItems() && now.Hour() >= 9 {
 			log.Println("time to send an alarm ", now)
 			if err := sch.sendItemsAlarm(); err != nil {
 				return err
 			}
 		}
+		time.Sleep(60 * time.Second)
 	}
 }
 
@@ -233,31 +232,28 @@ func (sch *Scheduler) sendItemsAlarm() error {
 }
 
 func (sch *Scheduler) sendBirthdayAlarm() error {
-	mail := mail.MailSender{}
-	mail.FillConf(sch.mail_simulation)
-	templFileName := "templates/birthday-mail.html"
-	if err := mail.BuildEmailMsg(templFileName, sch.nextBirthday); err != nil {
-		return err
-	}
-	if err := mail.SendEmailViaRelay(); err != nil {
+	if err := sendEmail("templates/birthday-mail.html", sch.simulation, sch.nextBirthday); err != nil {
 		return err
 	}
 	sch.nextBirthday = make([]*idl.SchedNextItem, 0)
-
+	return nil
+}
+func (sch *Scheduler) sendAnniversaryAlarm() error {
+	if err := sendEmail("templates/anniversary-mail.html", sch.simulation, sch.nextAnniversary); err != nil {
+		return err
+	}
+	sch.nextAnniversary = make([]*idl.SchedNextItem, 0)
 	return nil
 }
 
-func (sch *Scheduler) sendAnniversaryAlarm() error {
+func sendEmail(templFileName string, simulation bool, schItems []*idl.SchedNextItem) error {
 	mail := mail.MailSender{}
-	mail.FillConf(sch.mail_simulation)
-	templFileName := "templates/anniversary-mail.html"
-	if err := mail.BuildEmailMsg(templFileName, sch.nextAnniversary); err != nil {
+	mail.FillConf(simulation)
+	if err := mail.BuildEmailMsg(templFileName, schItems); err != nil {
 		return err
 	}
 	if err := mail.SendEmailViaRelay(); err != nil {
 		return err
 	}
-
-	sch.nextAnniversary = make([]*idl.SchedNextItem, 0)
 	return nil
 }

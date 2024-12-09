@@ -7,7 +7,7 @@ import (
 
 var (
 	Appname = "birthday-sch"
-	Buildnr = "00.001.20241208-04"
+	Buildnr = "00.002.20241209-00"
 )
 
 type SchedItem struct {
