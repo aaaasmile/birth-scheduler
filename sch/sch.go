@@ -153,10 +153,11 @@ func (sch *Scheduler) scheduleNext(schList *idl.SchedList) error {
 			if err != nil {
 				return err
 			}
-			if now.Day() == time_item.Day() {
+			if (now.Day() == time_item.Day()) &&
+				(now.Month() == time_item.Month()) {
+				log.Println("candidate for today alarm", nextItem)
 				if nextItem.EventType == idl.Birthday {
 					sch.nextBirthday = append(sch.nextBirthday, &nextItem)
-
 				}
 				if nextItem.EventType == idl.Anniversary {
 					sch.nextAnniversary = append(sch.nextAnniversary, &nextItem)
