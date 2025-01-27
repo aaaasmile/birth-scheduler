@@ -73,8 +73,8 @@ func (sch *Scheduler) checkSite() error {
 	c := colly.NewCollector()
 	c.OnHTML("body > main > section.event-hero.bg-mono-darkest.color-brand-primary > div.event-hero__content > div > div > div:nth-child(1) > div > div.event-hero__buttons.mt-5 > p", func(e *colly.HTMLElement) {
 		pp := e.Text
-		//fmt.Println("*** P is ", pp, e)
-		if strings.Contains(pp, "Check back soon for entry details on this race") {
+		log.Println("Site checked: ", e)
+		if !strings.Contains(pp, "Check back soon for entry details on this race") {
 			log.Println("Site has changed to: ", pp)
 			if err := sch.sendWebChangedAlarm(URL); err != nil {
 				log.Println("[OnHTML] error ", err)
@@ -95,12 +95,15 @@ func (sch *Scheduler) checkSite() error {
 
 func (sch *Scheduler) doSchedule() error {
 	sch.monitoredURL = conf.Current.UrlToCheck
-	return sch.checkSite()
 
 	log.Println("Infinite scheduler loop")
+	if sch.monitoredURL != "" {
+		log.Println("Url to check is set to ", sch.monitoredURL)
+	}
 	last_day := 0
 	last_month := time.Month(1)
 	last_year := 0
+	sleeped_time := -1
 	for {
 		now := time.Now()
 		if now.Year() > last_year {
@@ -127,7 +130,14 @@ func (sch *Scheduler) doSchedule() error {
 				return err
 			}
 		}
+		if sleeped_time == -1 || sleeped_time > 3600*6 {
+			if err := sch.checkSite(); err != nil {
+				return err
+			}
+			sleeped_time = 0
+		}
 		time.Sleep(60 * time.Second)
+		sleeped_time += 60
 	}
 }
 
