@@ -88,3 +88,9 @@ solo locale fuori da git. Si trova in:
 Per lo sviluppo iniziale ho usato windows, poi, per l'update del service,
 ho usato Visual Code Remote nella directory ~/build/birth-scheduler.
 
+## Web Check
+Ho messo nello scheduler la possibilità di effettuare un check di una web page
+per sapere se è cambiata. Basta mettere la URL in config_custom.toml e ogni 6 ore
+viene effettuato un check. Se il testo cercato cambia viene mandato un allarme e la
+ricerca viene cancellata.
+
