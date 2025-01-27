@@ -1,6 +1,7 @@
 DataFileName = "data.json"
 SimulateAlarm = false
 Debug = false
+UrlToCheck = "<todo in custom>"
 
 [Relay]
 SendMail = false

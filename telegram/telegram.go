@@ -34,6 +34,16 @@ func (ts *TelegramSender) BuildMsg(templFileName string, listsrc []*idl.SchedNex
 	return nil
 }
 
+func (ts *TelegramSender) BuildMsgWithURL(templFileName string, URL string) error {
+	var partPlainContent bytes.Buffer
+	tmplBody := template.Must(template.New("MailBody").ParseFiles(templFileName))
+	if err := tmplBody.ExecuteTemplate(&partPlainContent, "mailPlain", URL); err != nil {
+		return err
+	}
+	ts.content = partPlainContent.String()
+	return nil
+}
+
 func (ts *TelegramSender) Send() error {
 	if !ts.cfg.SendTelegram {
 		log.Println("not send telegram")

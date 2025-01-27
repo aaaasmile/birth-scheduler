@@ -26,6 +26,29 @@ func (ms *MailSender) FillConf(simulate bool) {
 	ms.simulate = simulate
 }
 
+func (ms *MailSender) BuildEmailMsgWithURL(templFileName string, URL string) error {
+	if !ms.relay.SendMail {
+		return nil
+	}
+	ms.message = bytes.Buffer{}
+	bound2 := randomBoundary()
+
+	var partHTMLCont, partSubj, partPlainContent bytes.Buffer
+	tmplBodyMail := template.Must(template.New("MailBody").ParseFiles(templFileName))
+	if err := tmplBodyMail.ExecuteTemplate(&partHTMLCont, "mailbody", URL); err != nil {
+		return err
+	}
+	if err := tmplBodyMail.ExecuteTemplate(&partSubj, "mailSubj", URL); err != nil {
+		return err
+	}
+
+	if err := tmplBodyMail.ExecuteTemplate(&partPlainContent, "mailPlain", URL); err != nil {
+		return err
+	}
+
+	return ms.writeMsg(partSubj, bound2, partPlainContent, partHTMLCont)
+}
+
 func (ms *MailSender) BuildEmailMsg(templFileName string, listsrc []*idl.SchedNextItem) error {
 	if !ms.relay.SendMail {
 		return nil
@@ -46,6 +69,10 @@ func (ms *MailSender) BuildEmailMsg(templFileName string, listsrc []*idl.SchedNe
 		return err
 	}
 
+	return ms.writeMsg(partSubj, bound2, partPlainContent, partHTMLCont)
+}
+
+func (ms *MailSender) writeMsg(partSubj bytes.Buffer, bound2 string, partPlainContent bytes.Buffer, partHTMLCont bytes.Buffer) error {
 	msg := &ms.message
 	msg.Write([]byte("MIME-version: 1.0;\r\n"))
 	partSubj.WriteTo(msg)
@@ -55,13 +82,11 @@ func (ms *MailSender) BuildEmailMsg(templFileName string, listsrc []*idl.SchedNe
 	msg.Write([]byte("To: " + ms.relay.EmailTarget + "\r\n"))
 	msg.Write([]byte("Content-Type:  multipart/alternative; boundary=" + `"` + bound2 + `"` + "\r\n"))
 	msg.Write([]byte("\r\n"))
-
 	// plain section
 	msg.Write([]byte("--" + bound2 + "\r\n"))
 	msg.Write([]byte("Content-Type: text/plain; charset=\"UTF-8\"\r\n"))
 	partPlainContent.WriteTo(msg)
 	msg.Write([]byte("\r\n"))
-
 	// html section
 	msg.Write([]byte("--" + bound2 + "\r\n"))
 	msg.Write([]byte("Content-Type: text/html; charset=\"UTF-8\"\r\n"))

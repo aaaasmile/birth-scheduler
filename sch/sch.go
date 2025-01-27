@@ -13,12 +13,15 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gocolly/colly/v2"
 )
 
 type Scheduler struct {
 	datafileName    string
 	nextBirthday    []*idl.SchedNextItem
 	nextAnniversary []*idl.SchedNextItem
+	monitoredURL    string
 	simulation      bool
 	debug           bool
 }
@@ -61,7 +64,39 @@ loop:
 	return nil
 }
 
+func (sch *Scheduler) checkSite() error {
+	URL := sch.monitoredURL
+	if URL == "" {
+		return nil
+	}
+	log.Println("Check URL for", URL)
+	c := colly.NewCollector()
+	c.OnHTML("body > main > section.event-hero.bg-mono-darkest.color-brand-primary > div.event-hero__content > div > div > div:nth-child(1) > div > div.event-hero__buttons.mt-5 > p", func(e *colly.HTMLElement) {
+		pp := e.Text
+		//fmt.Println("*** P is ", pp, e)
+		if strings.Contains(pp, "Check back soon for entry details on this race") {
+			log.Println("Site has changed to: ", pp)
+			if err := sch.sendWebChangedAlarm(URL); err != nil {
+				log.Println("[OnHTML] error ", err)
+			}
+		}
+	})
+	c.OnRequest(func(r *colly.Request) {
+		log.Println("Visiting", r.URL.String())
+	})
+	c.OnError(func(e *colly.Response, err error) {
+		log.Println("Error on scrap", err)
+	})
+	c.Visit(URL)
+
+	log.Println("check site done")
+	return nil
+}
+
 func (sch *Scheduler) doSchedule() error {
+	sch.monitoredURL = conf.Current.UrlToCheck
+	return sch.checkSite()
+
 	log.Println("Infinite scheduler loop")
 	last_day := 0
 	last_month := time.Month(1)
@@ -247,6 +282,20 @@ func (sch *Scheduler) sendBirthdayAlarm() error {
 	sch.nextBirthday = make([]*idl.SchedNextItem, 0)
 	return nil
 }
+
+func (sch *Scheduler) sendWebChangedAlarm(URL string) error {
+	templ := "templates/webchanged-mail.html"
+	if err := sendEmailForWeb(templ, sch.simulation, URL); err != nil {
+		return err
+	}
+	if err := sendTelegramForWeb(templ, sch.simulation, URL, sch.debug); err != nil {
+		return err
+	}
+	sch.monitoredURL = ""
+
+	return nil
+}
+
 func (sch *Scheduler) sendAnniversaryAlarm() error {
 	templ := "templates/anniversary-mail.html"
 	if err := sendEmail(templ, sch.simulation, sch.nextAnniversary); err != nil {
@@ -271,11 +320,36 @@ func sendEmail(templFileName string, simulation bool, schItems []*idl.SchedNextI
 	return nil
 }
 
+func sendEmailForWeb(templFileName string, simulation bool, URL string) error {
+	mail := mail.MailSender{}
+	mail.FillConf(simulation)
+	if err := mail.BuildEmailMsgWithURL(templFileName, URL); err != nil {
+		return err
+	}
+	if err := mail.SendEmailViaRelay(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func sendTelegram(templFileName string, simulation bool, schItems []*idl.SchedNextItem, debug bool) error {
 	ts := telegram.TelegramSender{}
 	ts.FillConf(simulation, debug)
 
 	if err := ts.BuildMsg(templFileName, schItems); err != nil {
+		return err
+	}
+	if err := ts.Send(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func sendTelegramForWeb(templFileName string, simulation bool, URL string, debug bool) error {
+	ts := telegram.TelegramSender{}
+	ts.FillConf(simulation, debug)
+
+	if err := ts.BuildMsgWithURL(templFileName, URL); err != nil {
 		return err
 	}
 	if err := ts.Send(); err != nil {

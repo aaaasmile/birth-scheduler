@@ -1,0 +1,19 @@
+{{define "mailSubj" -}}
+Subject: Web Site Changed Alarm
+{{end}}
+
+{{define "mailbody" -}}
+<div>Hello my Friend,</div>
+<p>there is a Web change on <a href="{{.}}">{{.}}</a> that you don't have to forget.</p>
+
+<p>Enjoy,</p>
+<p>aaaasmile</p>
+{{- end}}
+
+{{define "mailPlain" -}}
+Hello friend,
+there is a Web change on "{{.}}" that you don't have to forget.
+
+Enjoy,
+aaaasmile
+{{- end}}

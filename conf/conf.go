@@ -15,6 +15,7 @@ type Config struct {
 	Telegram      *Telegram
 	SimulateAlarm bool
 	Debug         bool
+	UrlToCheck    string
 }
 
 type Telegram struct {
