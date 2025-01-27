@@ -56,7 +56,6 @@ LimitNOFILE=1024
 
 Restart=on-failure
 RestartSec=10
-startLimitIntervalSec=60
 
 WorkingDirectory=/home/igor/app/go/birthday-scheduler/current/
 ExecStart=/home/igor/app/go/birthday-scheduler/current/birthday-scheduler.bin
