@@ -94,3 +94,11 @@ per sapere se è cambiata. Basta mettere la URL in config_custom.toml e ogni 6 o
 viene effettuato un check. Se il testo cercato cambia viene mandato un allarme e la
 ricerca viene cancellata.
 
+Selector quando è aperto:
+
+    body > main > section.event-hero.bg-mono-darkest.color-brand-primary > div.event-hero__content > div > div > div:nth-child(1) > div > div.event-hero__buttons.mb-n4
+
+Selector in wait:
+
+	 body > main > section.event-hero.bg-mono-darkest.color-brand-primary > div.event-hero__content > div > div > div:nth-child(1) > div > div.event-hero__buttons.mt-5 > p
+
